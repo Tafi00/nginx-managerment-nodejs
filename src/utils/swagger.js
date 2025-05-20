@@ -21,7 +21,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `http://localhost:${config.port}/api`,
+        url: `http://61.28.231.29:${config.port}/api`,
         description: 'Development server'
       }
     ],
@@ -112,7 +112,7 @@ function setupSwagger(app) {
     res.send(swaggerSpec);
   });
   
-  console.log(`Swagger documentation available at http://localhost:${config.port}/api-docs`);
+  console.log(`Swagger documentation available at http://61.28.231.29:${config.port}/api-docs`);
 }
 
 module.exports = setupSwagger; 

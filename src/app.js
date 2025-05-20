@@ -15,34 +15,8 @@ dotenv.config();
 // Tạo ứng dụng Express
 const app = express();
 
-// Cấu hình CORS
-const corsOptions = {
-  origin: '*', // Cho phép tất cả các nguồn gốc
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  credentials: true,
-  allowedHeaders: 'Content-Type,Authorization'
-};
-
 // Middleware
-app.use(cors(corsOptions));
-
-// Middleware để đặt các header CORS cho mỗi response
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  // Xử lý request OPTIONS
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  next();
-});
-
+app.use(cors()); // Sử dụng CORS mặc định
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 

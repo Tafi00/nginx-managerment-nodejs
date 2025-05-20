@@ -13,7 +13,6 @@ const config = {
   nginxReloadCommand: process.env.NGINX_RELOAD_COMMAND || 'systemctl reload nginx',
   nginxStatusCommand: process.env.NGINX_STATUS_COMMAND || 'systemctl status nginx',
   defaultServerPort: process.env.DEFAULT_SERVER_PORT || 3000,
-  sslCertificatesPath: process.env.SSL_CERTIFICATES_PATH || '/etc/letsencrypt/live',
   domainPrefix: process.env.DOMAIN_PREFIX || 'localhost',
   logLevel: process.env.LOG_LEVEL || 'info',
   adminToken: process.env.ADMIN_TOKEN || 'default_admin_token_change_me'
