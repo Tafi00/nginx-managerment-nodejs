@@ -16,6 +16,7 @@ const config = {
   sslCertificatesPath: process.env.SSL_CERTIFICATES_PATH || '/etc/letsencrypt/live',
   domainPrefix: process.env.DOMAIN_PREFIX || 'localhost',
   logLevel: process.env.LOG_LEVEL || 'info',
+  adminToken: process.env.ADMIN_TOKEN || 'default_admin_token_change_me'
 };
 
 module.exports = config; 

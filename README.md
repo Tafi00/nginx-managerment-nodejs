@@ -6,8 +6,11 @@ API Node.js để quản lý cấu hình Nginx, đặc biệt là gắn domain c
 
 - Tạo và quản lý domain mapping đến subfolder của localhost:3000
 - Kích hoạt/vô hiệu hóa cấu hình domain
-- Cài đặt SSL sử dụng Let's Encrypt
+- Cài đặt SSL sử dụng Let's Encrypt (Certbot)
 - Giám sát trạng thái Nginx
+- Hỗ trợ Next.js với cấu hình cho assets tĩnh
+- API documentation với Swagger/OpenAPI
+- Bảo mật API bằng token xác thực
 
 ## Cài đặt
 
@@ -39,6 +42,7 @@ NGINX_STATUS_COMMAND=systemctl status nginx
 DEFAULT_SERVER_PORT=3000
 SSL_CERTIFICATES_PATH=/etc/letsencrypt/live
 DOMAIN_PREFIX=localhost
+ADMIN_TOKEN=your_secure_token_here
 ```
 
 5. Khởi động ứng dụng:
@@ -50,6 +54,41 @@ npm start
 ```
 npm run dev
 ```
+
+## Xác thực API
+
+API này sử dụng xác thực token để bảo vệ các endpoints. Token được cấu hình trong biến môi trường `ADMIN_TOKEN`.
+
+Có hai cách để cung cấp token:
+
+1. **Authorization Header**: Sử dụng header Authorization với cú pháp Bearer Token
+   ```
+   Authorization: Bearer your_token_here
+   ```
+
+2. **Query Parameter**: Thêm query parameter `token` vào URL
+   ```
+   http://localhost:3001/api/domains?token=your_token_here
+   ```
+
+Tất cả các API endpoints ngoại trừ root endpoint (`/api`) đều yêu cầu xác thực token.
+
+## API Documentation
+
+API documentation được tạo tự động sử dụng Swagger/OpenAPI.
+
+- Để xem API documentation trực tiếp trên trình duyệt, truy cập:
+  ```
+  http://localhost:3001/api-docs
+  ```
+
+- Để xuất API documentation ra file:
+  ```
+  npm run generate-docs
+  ```
+  Điều này sẽ tạo ra các file trong thư mục `docs/`:
+  - `swagger.json`: Swagger specification dạng JSON
+  - `index.html`: Tệp HTML tĩnh chứa Swagger UI
 
 ## API Endpoints
 
@@ -70,6 +109,7 @@ npm run dev
 ```bash
 curl -X POST http://localhost:3001/api/domains \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_token_here" \
   -d '{
     "domain": "example.com",
     "subfolder": "example"
@@ -81,10 +121,64 @@ curl -X POST http://localhost:3001/api/domains \
 ```bash
 curl -X POST http://localhost:3001/api/domains/example.com/ssl \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your_token_here" \
   -d '{
     "email": "admin@example.com"
   }'
 ```
+
+## Mô tả Cấu hình Nginx
+
+API tạo cấu hình Nginx với các đặc điểm sau:
+
+1. **Proxy các asset tĩnh của Next.js**
+   ```nginx
+   location ~ ^/_next/ {
+       proxy_pass http://localhost:3000$request_uri;
+       proxy_set_header Host localhost:3000;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_ssl_server_name on;
+   }
+   ```
+
+2. **Proxy các file tĩnh trong thư mục /static/ hoặc /public/**
+   ```nginx
+   location ~ ^/(static|public)/ {
+       proxy_pass http://localhost:3000$request_uri;
+       proxy_set_header Host localhost:3000;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_ssl_server_name on;
+   }
+   ```
+
+3. **Proxy trang chính và sửa đường dẫn tương đối**
+   ```nginx
+   location / {
+       proxy_pass http://localhost:3000/subfolder;
+       proxy_set_header Host localhost:3000;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_ssl_server_name on;
+
+       # sửa các đường dẫn tương đối thành đường dẫn gốc
+       sub_filter_once off;
+       sub_filter 'href="/' 'href="http://localhost:3000/';
+       sub_filter 'src="/'  'src="http://localhost:3000/';
+       sub_filter 'action="/'   'action="http://localhost:3000/';
+       sub_filter 'content="/'  'content="http://localhost:3000/';
+   }
+   ```
+
+4. **SSL được cấu hình tự động bởi Certbot**
+   SSL được cài đặt thông qua Certbot với lệnh:
+   ```bash
+   certbot --nginx -d domain.com --non-interactive --agree-tos --email user@example.com
+   ```
 
 ## Yêu cầu hệ thống
 

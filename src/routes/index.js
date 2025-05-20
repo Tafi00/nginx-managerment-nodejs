@@ -1,5 +1,6 @@
 const express = require('express');
 const domainRoutes = require('./domainRoutes');
+const authenticateToken = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get('/', (req, res) => {
   });
 });
 
-// Sử dụng routes
-router.use('/domains', domainRoutes);
+// Sử dụng middleware xác thực cho tất cả các routes domains
+router.use('/domains', authenticateToken, domainRoutes);
 
 module.exports = router; 

@@ -26,6 +26,18 @@ const swaggerOptions = {
       }
     ],
     components: {
+      securitySchemes: {
+        BearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT'
+        },
+        ApiKeyAuth: {
+          type: 'apiKey',
+          in: 'query',
+          name: 'token'
+        }
+      },
       schemas: {
         Domain: {
           type: 'object',
@@ -75,7 +87,15 @@ const swaggerOptions = {
           }
         }
       }
-    }
+    },
+    security: [
+      {
+        BearerAuth: []
+      },
+      {
+        ApiKeyAuth: []
+      }
+    ]
   },
   apis: ['./src/routes/*.js', './src/controllers/*.js']
 };
