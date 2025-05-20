@@ -60,7 +60,7 @@ async function getDomain(req, res) {
 }
 
 /**
- * Tạo domain mới và cấu hình Nginx
+ * Tạo domain mới hoặc cập nhật nếu domain đã tồn tại
  */
 async function createDomain(req, res) {
   try {
@@ -75,39 +75,49 @@ async function createDomain(req, res) {
     
     // Kiểm tra xem domain đã tồn tại chưa
     const existingDomain = await domainModel.getDomainByName(domain);
-    if (existingDomain) {
-      return res.status(409).json({
-        success: false,
-        message: `Domain ${domain} đã tồn tại`
-      });
-    }
-    
-    // Tạo cấu hình Nginx
-    await nginxUtils.createNginxConfig(domain, subfolder);
-    
-    // Kích hoạt cấu hình
-    await nginxUtils.enableNginxConfig(domain);
-    
-    // Lưu thông tin domain vào database
-    const domainData = {
+    let isUpdate = false;
+    let domainData = {
       domain,
       subfolder,
       ssl: false,
       enabled: true
     };
     
-    await domainModel.addDomain(domainData);
+    if (existingDomain) {
+      isUpdate = true;
+      // Giữ lại cấu hình SSL nếu đã có
+      domainData.ssl = existingDomain.ssl;
+      
+      logger.info(`Domain ${domain} đã tồn tại, tiến hành cập nhật`);
+    }
     
-    res.status(201).json({
-      success: true,
-      message: `Domain ${domain} được tạo thành công`,
-      data: domainData
-    });
+    // Tạo cấu hình Nginx
+    await nginxUtils.createNginxConfig(domain, subfolder, domainData.ssl);
+    
+    // Kích hoạt cấu hình
+    await nginxUtils.enableNginxConfig(domain);
+    
+    // Lưu thông tin domain vào database
+    if (isUpdate) {
+      await domainModel.updateDomain(domain, domainData);
+      res.status(200).json({
+        success: true,
+        message: `Domain ${domain} được cập nhật thành công`,
+        data: domainData
+      });
+    } else {
+      await domainModel.addDomain(domainData);
+      res.status(201).json({
+        success: true,
+        message: `Domain ${domain} được tạo thành công`,
+        data: domainData
+      });
+    }
   } catch (error) {
     logger.error(`Error creating domain: ${error.message}`);
     res.status(500).json({
       success: false,
-      message: 'Không thể tạo domain mới',
+      message: 'Không thể tạo hoặc cập nhật domain',
       error: error.message
     });
   }
@@ -256,8 +266,8 @@ async function installSSLForDomain(req, res) {
       });
     }
     
-    // Cài đặt SSL
-    const success = await nginxUtils.installSSL(domain, email);
+    // Cài đặt SSL (sẽ cài mới hoặc cài lại tùy trường hợp)
+    const success = await nginxUtils.installSSL(domain, email, domainInfo.subfolder);
     
     if (!success) {
       return res.status(500).json({

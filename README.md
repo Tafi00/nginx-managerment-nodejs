@@ -6,7 +6,7 @@ API Node.js để quản lý cấu hình Nginx, đặc biệt là gắn domain c
 
 - Tạo và quản lý domain mapping đến subfolder của localhost:3000
 - Kích hoạt/vô hiệu hóa cấu hình domain
-- Cài đặt SSL sử dụng Let's Encrypt (Certbot)
+- Cài đặt SSL sử dụng Let's Encrypt (Certbot) với auto-renewal
 - Giám sát trạng thái Nginx
 - Hỗ trợ Next.js với cấu hình cho assets tĩnh
 - API documentation với Swagger/OpenAPI
@@ -98,10 +98,10 @@ API documentation được tạo tự động sử dụng Swagger/OpenAPI.
 |-------------|-----------|-------|
 | GET | /api/domains | Lấy danh sách tất cả domain |
 | GET | /api/domains/:domain | Lấy chi tiết một domain |
-| POST | /api/domains | Tạo domain mới |
+| POST | /api/domains | Tạo domain mới hoặc cập nhật nếu đã tồn tại |
 | PUT | /api/domains/:domain | Cập nhật domain |
 | DELETE | /api/domains/:domain | Xóa domain |
-| POST | /api/domains/:domain/ssl | Cài đặt SSL cho domain |
+| POST | /api/domains/:domain/ssl | Cài đặt hoặc cập nhật SSL cho domain (với auto-renewal) |
 | GET | /api/domains/nginx/status | Kiểm tra trạng thái Nginx |
 
 ### Ví dụ tạo domain mới
@@ -126,6 +126,19 @@ curl -X POST http://localhost:3001/api/domains/example.com/ssl \
     "email": "admin@example.com"
   }'
 ```
+
+## Chức năng đặc biệt
+
+### Tạo/cập nhật domain
+Khi gọi API tạo domain, nếu domain đã tồn tại, hệ thống sẽ tự động cập nhật cấu hình cho domain đó thay vì báo lỗi. Điều này giúp đơn giản hóa quy trình quản lý và tránh lỗi trùng lặp.
+
+### SSL với auto-renewal
+Khi cài đặt SSL, hệ thống sẽ:
+- Tự động cài đặt SSL với Let's Encrypt
+- Thiết lập auto-renewal (2 lần mỗi ngày)
+- Tự động chuyển hướng HTTP sang HTTPS
+- Giữ lại chứng chỉ hiện có nếu chưa hết hạn
+- Cập nhật chứng chỉ nếu đã tồn tại
 
 ## Mô tả Cấu hình Nginx
 
@@ -174,10 +187,15 @@ API tạo cấu hình Nginx với các đặc điểm sau:
    }
    ```
 
-4. **SSL được cấu hình tự động bởi Certbot**
-   SSL được cài đặt thông qua Certbot với lệnh:
+4. **SSL được cấu hình tự động bởi Certbot với auto-renewal**
+   SSL được cài đặt thông qua Certbot với các tùy chọn:
    ```bash
-   certbot --nginx -d domain.com --non-interactive --agree-tos --email user@example.com
+   certbot --nginx -d domain.com --non-interactive --agree-tos --email user@example.com --redirect --keep-until-expiring --renew-by-default --no-eff-email
+   ```
+   
+   Auto-renewal được thiết lập thông qua crontab:
+   ```
+   0 */12 * * * certbot renew --quiet
    ```
 
 ## Yêu cầu hệ thống
@@ -186,6 +204,7 @@ API tạo cấu hình Nginx với các đặc điểm sau:
 - Nginx đã được cài đặt
 - Quyền truy cập vào file cấu hình Nginx
 - Certbot (để cài đặt Let's Encrypt SSL)
+- Cron (để thiết lập auto-renewal)
 
 ## Giấy phép
 
