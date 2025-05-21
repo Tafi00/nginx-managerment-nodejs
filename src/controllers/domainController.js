@@ -266,6 +266,14 @@ async function installSSLForDomain(req, res) {
       });
     }
     
+    // Kiểm tra subfolder
+    if (!domainInfo.subfolder) {
+      return res.status(400).json({
+        success: false,
+        message: 'Domain này chưa có subfolder, vui lòng cập nhật lại domain/subfolder trước khi cài SSL.'
+      });
+    }
+    
     // Kiểm tra nếu đã có SSL thì trả về thành công luôn
     const sslExisted = await nginxUtils.checkSSLInstalled(domain);
     if (sslExisted) {
