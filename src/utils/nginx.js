@@ -268,18 +268,11 @@ async function listNginxConfigs() {
 }
 
 /**
- * Thiết lập auto renew cho certbot
+ * Hướng dẫn kiểm tra auto renew cho certbot (không chạy lệnh crontab nữa)
  */
 async function setupAutoRenew() {
-  try {
-    // Thêm cron job nếu chưa có (mặc định certbot cài đặt sẽ tự tạo cron, nhưng ta chủ động kiểm tra)
-    // Lệnh này sẽ thêm vào crontab nếu chưa có dòng certbot renew
-    const checkCmd = `crontab -l | grep 'certbot renew' || (crontab -l 2>/dev/null; echo '0 3 * * * certbot renew --quiet --deploy-hook "systemctl reload nginx"') | crontab -`;
-    await executeCommand(checkCmd);
-    logger.info('Đã thiết lập auto renew cho certbot');
-  } catch (error) {
-    logger.warn('Không thể thiết lập auto renew cho certbot (có thể đã tồn tại hoặc không có quyền): ' + error.message);
-  }
+  logger.info('Để kiểm tra auto renew certbot, hãy chạy: sudo systemctl status certbot.timer');
+  logger.info('Để test thử auto renew, hãy chạy: sudo certbot renew --dry-run');
 }
 
 module.exports = {
