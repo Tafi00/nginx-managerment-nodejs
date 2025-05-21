@@ -289,6 +289,8 @@ async function installSSLForDomain(req, res) {
       });
     }
     
+    // Thêm log debug trước khi gọi installSSL
+    logger.info(`DEBUG installSSL: domain=${domain}, subfolder=${domainInfo.subfolder}, email=${email}`);
     // Cài đặt SSL (sẽ cài mới hoặc cài lại tùy trường hợp)
     const success = await nginxUtils.installSSL(domain, email, domainInfo.subfolder);
     
