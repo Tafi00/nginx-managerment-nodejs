@@ -159,12 +159,6 @@ async function enableNginxConfig(domain) {
       return false;
     }
     
-    // Kiểm tra nếu symlink đã tồn tại thì xóa đi
-    if (await fs.pathExists(sitesEnabled)) {
-      await fs.unlink(sitesEnabled);
-      logger.info(`Removed existing symlink for ${domain}`);
-    }
-    
     // Tạo symlink
     await fs.symlink(sitesAvailable, sitesEnabled);
     logger.info(`Enabled Nginx configuration for ${domain}`);
@@ -214,92 +208,21 @@ async function disableNginxConfig(domain) {
 }
 
 /**
- * Kiểm tra xem SSL đã được cài đặt chưa
- * @param {string} domain - Domain cần kiểm tra
- * @returns {Promise<boolean>} - true nếu SSL đã được cài đặt
- */
-async function checkSSLInstalled(domain) {
-  logger.info(`DEBUG checkSSLInstalled: domain=${domain}, sslCertificatesPath=${config.sslCertificatesPath}`);
-  const sslCertPath = path.join(config.sslCertificatesPath, domain, 'fullchain.pem');
-  try {
-    return await fs.pathExists(sslCertPath);
-  } catch (error) {
-    logger.error(`Error checking SSL certificate: ${error.message}`);
-    return false;
-  }
-}
-
-/**
  * Cài đặt SSL cho domain sử dụng Let's Encrypt
  * @param {string} domain - Domain cần cài SSL
  * @param {string} email - Địa chỉ email
- * @param {string} subfolder - Subfolder trên localhost
  * @returns {Promise<boolean>} - true nếu thành công
  */
-async function installSSL(domain, email, subfolder) {
+async function installSSL(domain, email) {
   try {
-    // Kiểm tra xem SSL đã được cài đặt chưa
-    const sslInstalled = await checkSSLInstalled(domain);
-    
-    // Sử dụng certbot để cài SSL với auto renew
-    // --nginx: sử dụng plugin nginx
-    // --non-interactive: không yêu cầu người dùng tương tác
-    // --agree-tos: đồng ý với điều khoản dịch vụ
-    // --email: địa chỉ email để đăng ký và thông báo
-    // --redirect: tự động chuyển hướng HTTP sang HTTPS
-    // --keep-until-expiring: giữ lại chứng chỉ hiện có nếu chưa hết hạn
-    // --renew-by-default: tự động gia hạn
-    // --no-eff-email: không gửi email cho EFF
-    const command = `certbot --nginx -d ${domain} --non-interactive --agree-tos --email ${email} --redirect --keep-until-expiring --renew-by-default --no-eff-email`;
-    
+    // Sử dụng certbot để cài SSL
+    const command = `certbot --nginx -d ${domain} --non-interactive --agree-tos --email ${email}`;
     await executeCommand(command);
-    
-    if (sslInstalled) {
-      logger.info(`SSL certificate updated for ${domain}`);
-    } else {
-      logger.info(`SSL certificate installed for ${domain}`);
-    }
-    
-    // Thiết lập auto renew nếu chưa có
-    await setupAutoRenew();
+    logger.info(`SSL certificate installed for ${domain}`);
     
     return true;
   } catch (error) {
     logger.error(`Failed to install SSL: ${error.message}`);
-    return false;
-  }
-}
-
-/**
- * Thiết lập auto renew cho Let's Encrypt
- * @returns {Promise<boolean>} - true nếu thành công
- */
-async function setupAutoRenew() {
-  try {
-    // Kiểm tra xem cron job cho auto renew đã được thiết lập chưa
-    const checkCronCommand = "crontab -l | grep certbot";
-    
-    try {
-      const cronResult = await executeCommand(checkCronCommand);
-      
-      if (cronResult.includes('certbot renew')) {
-        // Cron job đã tồn tại
-        logger.info('Certbot auto-renewal already configured');
-        return true;
-      }
-    } catch (error) {
-      // Lệnh có thể thất bại nếu không có cron job nào
-      logger.info('No existing cron jobs found for certbot');
-    }
-    
-    // Thêm cron job mới để gia hạn chứng chỉ 2 lần mỗi ngày (chuẩn của Let's Encrypt)
-    const cronCommand = "(crontab -l 2>/dev/null; echo '0 */12 * * * certbot renew --quiet') | crontab -";
-    await executeCommand(cronCommand);
-    
-    logger.info('Certbot auto-renewal configured successfully');
-    return true;
-  } catch (error) {
-    logger.error(`Failed to setup auto renew: ${error.message}`);
     return false;
   }
 }
@@ -326,7 +249,7 @@ async function listNginxConfigs() {
         const subfolder = match ? match[1] : '';
         
         // Kiểm tra xem có SSL hay không
-        const hasSSL = content.includes('listen 443 ssl') || await checkSSLInstalled(domain);
+        const hasSSL = content.includes('listen 443 ssl');
         
         results.push({
           domain,
@@ -344,13 +267,27 @@ async function listNginxConfigs() {
   }
 }
 
+/**
+ * Thiết lập auto renew cho certbot
+ */
+async function setupAutoRenew() {
+  try {
+    // Thêm cron job nếu chưa có (mặc định certbot cài đặt sẽ tự tạo cron, nhưng ta chủ động kiểm tra)
+    // Lệnh này sẽ thêm vào crontab nếu chưa có dòng certbot renew
+    const checkCmd = `crontab -l | grep 'certbot renew' || (crontab -l 2>/dev/null; echo '0 3 * * * certbot renew --quiet --deploy-hook "systemctl reload nginx"') | crontab -`;
+    await executeCommand(checkCmd);
+    logger.info('Đã thiết lập auto renew cho certbot');
+  } catch (error) {
+    logger.warn('Không thể thiết lập auto renew cho certbot (có thể đã tồn tại hoặc không có quyền): ' + error.message);
+  }
+}
+
 module.exports = {
   checkNginxStatus,
   createNginxConfig,
   enableNginxConfig,
   disableNginxConfig,
   installSSL,
-  checkSSLInstalled,
-  setupAutoRenew,
-  listNginxConfigs
+  listNginxConfigs,
+  setupAutoRenew
 }; 

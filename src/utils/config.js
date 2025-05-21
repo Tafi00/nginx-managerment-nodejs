@@ -4,11 +4,6 @@ const path = require('path');
 // Tải các biến môi trường từ file .env
 dotenv.config();
 
-let defaultSSLCertPath = '/etc/letsencrypt/live';
-if (process.platform === 'win32') {
-  defaultSSLCertPath = 'C:/etc/letsencrypt/live';
-}
-
 // Mặc định nếu các biến môi trường không được đặt
 const config = {
   port: process.env.PORT || 3001,
@@ -18,7 +13,6 @@ const config = {
   nginxReloadCommand: process.env.NGINX_RELOAD_COMMAND || 'systemctl reload nginx',
   nginxStatusCommand: process.env.NGINX_STATUS_COMMAND || 'systemctl status nginx',
   defaultServerPort: process.env.DEFAULT_SERVER_PORT || 3000,
-  sslCertificatesPath: process.env.SSL_CERTIFICATES_PATH || defaultSSLCertPath,
   domainPrefix: process.env.DOMAIN_PREFIX || 'localhost',
   logLevel: process.env.LOG_LEVEL || 'info',
   adminToken: process.env.ADMIN_TOKEN || 'default_admin_token_change_me'

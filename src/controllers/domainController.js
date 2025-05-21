@@ -60,54 +60,50 @@ async function getDomain(req, res) {
 }
 
 /**
- * Tạo domain mới hoặc cập nhật nếu domain đã tồn tại
+ * Tạo domain mới và cấu hình Nginx
  */
 async function createDomain(req, res) {
   try {
     const { domain, subfolder } = req.body;
-    
     if (!domain || !subfolder) {
       return res.status(400).json({
         success: false,
         message: 'Domain và subfolder không được để trống'
       });
     }
-    
     // Kiểm tra xem domain đã tồn tại chưa
     const existingDomain = await domainModel.getDomainByName(domain);
-    let isUpdate = false;
-    let domainData = {
-      domain,
-      subfolder,
-      ssl: false,
-      enabled: true
-    };
-    
+    let domainData;
     if (existingDomain) {
-      isUpdate = true;
-      // Giữ lại cấu hình SSL nếu đã có
-      domainData.ssl = existingDomain.ssl;
-      
-      logger.info(`Domain ${domain} đã tồn tại, tiến hành cập nhật`);
-    }
-    
-    // Tạo cấu hình Nginx
-    await nginxUtils.createNginxConfig(domain, subfolder, domainData.ssl);
-    
-    // Kích hoạt cấu hình
-    await nginxUtils.enableNginxConfig(domain);
-    
-    // Lưu thông tin domain vào database
-    if (isUpdate) {
+      // Nếu đã tồn tại thì update lại subfolder và enabled (giữ ssl)
+      domainData = {
+        ...existingDomain,
+        subfolder,
+        enabled: true,
+        updatedAt: new Date().toISOString()
+      };
+      await nginxUtils.createNginxConfig(domain, subfolder, existingDomain.ssl);
+      await nginxUtils.enableNginxConfig(domain);
       await domainModel.updateDomain(domain, domainData);
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        message: `Domain ${domain} được cập nhật thành công`,
+        message: `Domain ${domain} đã tồn tại, thông tin đã được cập nhật`,
         data: domainData
       });
     } else {
+      // Nếu chưa có thì tạo mới
+      await nginxUtils.createNginxConfig(domain, subfolder);
+      await nginxUtils.enableNginxConfig(domain);
+      domainData = {
+        domain,
+        subfolder,
+        ssl: false,
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
       await domainModel.addDomain(domainData);
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message: `Domain ${domain} được tạo thành công`,
         data: domainData
@@ -117,7 +113,7 @@ async function createDomain(req, res) {
     logger.error(`Error creating domain: ${error.message}`);
     res.status(500).json({
       success: false,
-      message: 'Không thể tạo hoặc cập nhật domain',
+      message: 'Không thể tạo domain mới',
       error: error.message
     });
   }
@@ -242,21 +238,18 @@ async function installSSLForDomain(req, res) {
   try {
     const { domain } = req.params;
     const { email } = req.body;
-    
     if (!domain) {
       return res.status(400).json({
         success: false,
         message: 'Tên domain không được để trống'
       });
     }
-    
     if (!email) {
       return res.status(400).json({
         success: false,
         message: 'Email không được để trống'
       });
     }
-    
     // Kiểm tra domain có tồn tại không
     const domainInfo = await domainModel.getDomainByName(domain);
     if (!domainInfo) {
@@ -265,50 +258,31 @@ async function installSSLForDomain(req, res) {
         message: `Domain ${domain} không tồn tại`
       });
     }
-    
-    // Kiểm tra subfolder
-    if (!domainInfo.subfolder) {
-      return res.status(400).json({
-        success: false,
-        message: 'Domain này chưa có subfolder, vui lòng cập nhật lại domain/subfolder trước khi cài SSL.'
-      });
-    }
-    
-    // Kiểm tra nếu đã có SSL thì trả về thành công luôn
-    const sslExisted = await nginxUtils.checkSSLInstalled(domain);
-    if (sslExisted) {
-      // Đảm bảo cập nhật trạng thái ssl trong database nếu chưa đúng
-      if (!domainInfo.ssl) {
-        const updatedData = { ...domainInfo, ssl: true };
-        await domainModel.updateDomain(domain, updatedData);
-      }
+    // Nếu đã có SSL thì trả về thành công luôn
+    if (domainInfo.ssl) {
       return res.status(200).json({
         success: true,
         message: `SSL đã được cài đặt cho domain ${domain}`,
-        data: { ...domainInfo, ssl: true }
+        data: domainInfo
       });
     }
-    
-    // Thêm log debug trước khi gọi installSSL
-    logger.info(`DEBUG installSSL: domain=${domain}, subfolder=${domainInfo.subfolder}, email=${email}`);
-    // Cài đặt SSL (sẽ cài mới hoặc cài lại tùy trường hợp)
-    const success = await nginxUtils.installSSL(domain, email, domainInfo.subfolder);
-    
+    // Cài đặt SSL
+    const success = await nginxUtils.installSSL(domain, email);
     if (!success) {
       return res.status(500).json({
         success: false,
         message: 'Không thể cài đặt SSL'
       });
     }
-    
+    // Thiết lập auto renew certbot
+    await nginxUtils.setupAutoRenew();
     // Cập nhật thông tin domain
     const updatedData = {
       ...domainInfo,
-      ssl: true
+      ssl: true,
+      updatedAt: new Date().toISOString()
     };
-    
     await domainModel.updateDomain(domain, updatedData);
-    
     res.status(200).json({
       success: true,
       message: `SSL đã được cài đặt cho domain ${domain}`,

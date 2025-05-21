@@ -78,7 +78,7 @@ router.get('/:domain', domainController.getDomain);
  * @swagger
  * /domains:
  *   post:
- *     summary: Tạo domain mới hoặc cập nhật nếu đã tồn tại
+ *     summary: Tạo domain mới
  *     tags: [Domains]
  *     requestBody:
  *       required: true
@@ -114,23 +114,14 @@ router.get('/:domain', domainController.getDomain);
  *                   example: Domain example.com được tạo thành công
  *                 data:
  *                   $ref: '#/components/schemas/Domain'
- *       200:
- *         description: Domain được cập nhật thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Domain example.com được cập nhật thành công
- *                 data:
- *                   $ref: '#/components/schemas/Domain'
- *       400:
- *         description: Dữ liệu không hợp lệ
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Domain đã tồn tại
  *         content:
  *           application/json:
  *             schema:
@@ -249,7 +240,7 @@ router.delete('/:domain', domainController.deleteDomain);
  * @swagger
  * /domains/{domain}/ssl:
  *   post:
- *     summary: Cài đặt hoặc cập nhật SSL cho domain
+ *     summary: Cài đặt SSL cho domain
  *     tags: [Domains]
  *     parameters:
  *       - in: path
