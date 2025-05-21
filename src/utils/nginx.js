@@ -219,6 +219,7 @@ async function disableNginxConfig(domain) {
  * @returns {Promise<boolean>} - true nếu SSL đã được cài đặt
  */
 async function checkSSLInstalled(domain) {
+  logger.info(`DEBUG checkSSLInstalled: domain=${domain}, sslCertificatesPath=${config.sslCertificatesPath}`);
   const sslCertPath = path.join(config.sslCertificatesPath, domain, 'fullchain.pem');
   try {
     return await fs.pathExists(sslCertPath);
