@@ -266,6 +266,21 @@ async function installSSLForDomain(req, res) {
       });
     }
     
+    // Kiểm tra nếu đã có SSL thì trả về thành công luôn
+    const sslExisted = await nginxUtils.checkSSLInstalled(domain);
+    if (sslExisted) {
+      // Đảm bảo cập nhật trạng thái ssl trong database nếu chưa đúng
+      if (!domainInfo.ssl) {
+        const updatedData = { ...domainInfo, ssl: true };
+        await domainModel.updateDomain(domain, updatedData);
+      }
+      return res.status(200).json({
+        success: true,
+        message: `SSL đã được cài đặt cho domain ${domain}`,
+        data: { ...domainInfo, ssl: true }
+      });
+    }
+    
     // Cài đặt SSL (sẽ cài mới hoặc cài lại tùy trường hợp)
     const success = await nginxUtils.installSSL(domain, email, domainInfo.subfolder);
     
